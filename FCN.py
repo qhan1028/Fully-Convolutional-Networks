@@ -21,11 +21,13 @@ tf.flags.DEFINE_string("data_dir", "Data_zoo/MIT_SceneParsing/", "Path to data s
 tf.flags.DEFINE_string("res_dir", "res/", "Path to result directory")
 tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
 tf.flags.DEFINE_string("model_dir", "Model_zoo/", "Path to vgg model mat")
-tf.flags.DEFINE_bool('debug', "False", "Debug mode: True/ False")
+tf.flags.DEFINE_bool('debug', "False", "Debug mode: True / False")
 tf.flags.DEFINE_string('mode', "test", "Mode: train / test / visualize")
-tf.flags.DEFINE_string('testlist', 'self_test', "Test list for testing.")
+tf.flags.DEFINE_string('testlist', 'testlist.txt', "Test list for testing.")
 
-print('==================== [' + FLAGS.mode + '] ====================')
+print('=============== [' + FLAGS.mode + '] ===============')
+for key, value in FLAGS.__flags.items(): print(key + ':', value)
+print('====================================================')
 
 MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydeep-19.mat'
 
@@ -33,7 +35,6 @@ MAX_ITERATION = int(1e5 + 1)
 NUM_OF_CLASSESS = 151
 IMAGE_SIZE = 224
 
-FLAGS.res_dir = 'res/'
 
 def vgg_net(weights, image):
     layers = (
@@ -176,8 +177,8 @@ def main(argv=None):
 
     print("Setting up image reader...")
     train_records, valid_records = scene_parsing.read_dataset(FLAGS.data_dir)
-    print(len(train_records))
-    print(len(valid_records))
+    print('Train len:', len(train_records))
+    print('Val len:', len(valid_records))
 
     if FLAGS.mode != 'test':
         print("Setting up dataset reader")
@@ -210,7 +211,7 @@ def main(argv=None):
                 print("Step: %d, Train_loss:%g" % (itr, train_loss), flush=True)
                 summary_writer.add_summary(summary_str, itr)
 
-            if itr % 500 == 0:
+            if itr % 1000 == 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(FLAGS.batch_size)
                 valid_loss = sess.run(loss, feed_dict={image: valid_images, annotation: valid_annotations,
                                                        keep_probability: 1.0})
@@ -234,8 +235,8 @@ def main(argv=None):
             print("Saved image: %d, %.4f secs" % (itr, ve-vs))
 
     elif FLAGS.mode == "test":
-        testlist = sys.argv[1]
-        print('Test list: ' + FLAGS.testlist)
+        testlist = FLAGS.testlist
+        print('Test list: ' + testlist)
         print('Result directory: ' + FLAGS.res_dir)
         images, names = read_test_data(testlist, IMAGE_SIZE, IMAGE_SIZE)
         for i, (im, name) in enumerate(zip(images, names)):
