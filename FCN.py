@@ -208,7 +208,7 @@ def main():
             print('Train data set loaded. %.4f' % (le-ls))
         ls = time.time()
         validation_dataset_reader = dataset.BatchDatset(valid_records, image_options)
-        es = time.time()
+        le = time.time()
         print('Validation data set loaded. %.4f' % (le-ls))
 
     sess = tf.Session()
@@ -242,12 +242,12 @@ def main():
 
             sess.run(train_op, feed_dict=feed_dict)
 
-            if itr % 10 == 0:
+            if itr % 10 == 0 and itr != 0:
                 train_loss, summary_str = sess.run([loss, summary_op], feed_dict=feed_dict)
                 print("Step: %d, Train_loss:%g" % (itr, train_loss), flush=True)
                 summary_writer.add_summary(summary_str, itr)
 
-            if itr % 500 == 0:
+            if itr % 100 == 0 and itr != 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(args.batch_size)
                 valid_loss, val_str = sess.run([loss, val_summary], feed_dict={image: valid_images, annotation: valid_annotations,
                                                        keep_probability: 1.0})
