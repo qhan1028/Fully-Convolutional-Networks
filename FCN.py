@@ -1,38 +1,40 @@
 from __future__ import print_function
 import tensorflow as tf
 import numpy as np
+import scipy.misc as misc
 import sys
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='3'
+import argparse
+import PIL.Image as Image
 
 import TensorflowUtils as utils
 import read_MITSceneParsingData as scene_parsing
 import datetime
 import time
 import BatchDatsetReader as dataset
-from six.moves import xrange
 
 from Reader import *
 
-FLAGS = tf.flags.FLAGS
-tf.flags.DEFINE_integer("batch_size", "2", "Batch size for training")
-tf.flags.DEFINE_string("logs_dir", "logs/", "Path to logs directory")
-tf.flags.DEFINE_string("data_dir", "Data_zoo/MIT_SceneParsing/", "Path to data set")
-tf.flags.DEFINE_string("res_dir", "res/", "Path to result directory")
-tf.flags.DEFINE_float("learning_rate", "1e-4", "Learning rate for Adam Optimizer")
-tf.flags.DEFINE_string("model_dir", "Model_zoo/", "Path to vgg model mat")
-tf.flags.DEFINE_bool('debug', "False", "Debug mode: True / False")
-tf.flags.DEFINE_string('mode', "test", "Mode: train / test / visualize")
-tf.flags.DEFINE_string('testlist', 'testlist.txt', "Test list for testing.")
-
-print('=============== [' + FLAGS.mode + '] ===============')
-for key, value in FLAGS.__flags.items(): print(key + ':', value)
-print('====================================================')
+parser = argparse.ArgumentParser('Fully Convolutional Networks for Semantic Segmentation.')
+parser.add_argument('-m', '--mode', metavar='MODE', default='train', choices=['train', 'visualize', 'test'], help='Mode: train / visualize / test.')
+parser.add_argument('-b', '--batch-size', metavar='N', default=2, nargs='?', type=int, help='Batch size for training.')
+parser.add_argument('-e', '--learning-rate', '--eta', metavar='N', default=1e-4, nargs='?', type=float, help='Learning rate for Adam Optimizer.')
+parser.add_argument('-i', '--iter', metavar='N', default=int(1e5), nargs='?', type=int, help='Max iteration for training.')
+parser.add_argument('-si', '--start-iter', metavar='N', default=0, nargs='?', type=int, help='Start iteration for training.')
+parser.add_argument('-d', '--data-dir', metavar='DIR', default='Data_zoo/MIT_SceneParsing', nargs='?', help='Path to training & validation data.')
+parser.add_argument('-ld', '--logs-dir', metavar='DIR', default='logs', nargs='?', help='Path to logs directory.')
+parser.add_argument('-rd', '--res-dir', metavar='DIR', default='res', nargs='?', help='Path to result directory.')
+parser.add_argument('-md', '--model-dir', metavar='DIR', default='Model_zoo', nargs='?', help='Path to vgg pretrained model.')
+parser.add_argument('--debug', action='store_true', default=False, help='Debug mode.')
+parser.add_argument('--testlist', metavar='FILE', default='testlist.txt', nargs='?', help='Test list for testing.')
+parser.add_argument('-v', '--video', action='store_true', default=False, help='Resize back to original size.')
+args = parser.parse_args()
 
 MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydeep-19.mat'
 
 MAX_ITERATION = int(1e5 + 1)
-NUM_OF_CLASSESS = 151
+NUM_OF_CLASSESS = 2
 IMAGE_SIZE = 224
 
 
@@ -63,12 +65,14 @@ def vgg_net(weights, image):
             kernels = utils.get_variable(np.transpose(kernels, (1, 0, 2, 3)), name=name + "_w")
             bias = utils.get_variable(bias.reshape(-1), name=name + "_b")
             current = utils.conv2d_basic(current, kernels, bias)
+            print('conv ' + name[4:] + ':', current.shape)
         elif kind == 'relu':
             current = tf.nn.relu(current, name=name)
-            if FLAGS.debug:
+            if args.debug:
                 utils.add_activation_summary(current)
         elif kind == 'pool':
             current = utils.avg_pool_2x2(current)
+            print('pool ' + name[4:] + ':', current.shape)
         net[name] = current
 
     return net
@@ -82,7 +86,7 @@ def inference(image, keep_prob):
     :return:
     """
     print("setting up vgg initialized conv layers ...")
-    model_data = utils.get_model_data(FLAGS.model_dir, MODEL_URL)
+    model_data = utils.get_model_data(args.model_dir, MODEL_URL)
 
     mean = model_data['normalization'][0][0][0]
     mean_pixel = np.mean(mean, axis=(0, 1))
@@ -91,31 +95,37 @@ def inference(image, keep_prob):
 
     processed_image = utils.process_image(image, mean_pixel)
 
+    print('----------------------------------------------------')
     with tf.variable_scope("inference"):
         image_net = vgg_net(weights, processed_image)
         conv_final_layer = image_net["conv5_3"]
+        print('conv 5_3:', conv_final_layer.get_shape())
 
         pool5 = utils.max_pool_2x2(conv_final_layer)
+        print('pool 5:', pool5.get_shape())
 
         W6 = utils.weight_variable([7, 7, 512, 4096], name="W6")
         b6 = utils.bias_variable([4096], name="b6")
         conv6 = utils.conv2d_basic(pool5, W6, b6)
+        print('conv 6:', conv6.get_shape())
         relu6 = tf.nn.relu(conv6, name="relu6")
-        if FLAGS.debug:
+        if args.debug:
             utils.add_activation_summary(relu6)
         relu_dropout6 = tf.nn.dropout(relu6, keep_prob=keep_prob)
 
         W7 = utils.weight_variable([1, 1, 4096, 4096], name="W7")
         b7 = utils.bias_variable([4096], name="b7")
         conv7 = utils.conv2d_basic(relu_dropout6, W7, b7)
+        print('conv 7:', conv7.get_shape())
         relu7 = tf.nn.relu(conv7, name="relu7")
-        if FLAGS.debug:
+        if args.debug:
             utils.add_activation_summary(relu7)
         relu_dropout7 = tf.nn.dropout(relu7, keep_prob=keep_prob)
 
         W8 = utils.weight_variable([1, 1, 4096, NUM_OF_CLASSESS], name="W8")
         b8 = utils.bias_variable([NUM_OF_CLASSESS], name="b8")
         conv8 = utils.conv2d_basic(relu_dropout7, W8, b8)
+        print('conv 8:', conv8.get_shape())
         # annotation_pred1 = tf.argmax(conv8, dimension=3, name="prediction1")
 
         # now to upscale to actual image size
@@ -123,85 +133,107 @@ def inference(image, keep_prob):
         W_t1 = utils.weight_variable([4, 4, deconv_shape1[3].value, NUM_OF_CLASSESS], name="W_t1")
         b_t1 = utils.bias_variable([deconv_shape1[3].value], name="b_t1")
         conv_t1 = utils.conv2d_transpose_strided(conv8, W_t1, b_t1, output_shape=tf.shape(image_net["pool4"]))
+        print('conv t1:', conv_t1.get_shape())
         fuse_1 = tf.add(conv_t1, image_net["pool4"], name="fuse_1")
+        print('fuse 1:', fuse_1.get_shape())
 
         deconv_shape2 = image_net["pool3"].get_shape()
         W_t2 = utils.weight_variable([4, 4, deconv_shape2[3].value, deconv_shape1[3].value], name="W_t2")
         b_t2 = utils.bias_variable([deconv_shape2[3].value], name="b_t2")
         conv_t2 = utils.conv2d_transpose_strided(fuse_1, W_t2, b_t2, output_shape=tf.shape(image_net["pool3"]))
+        print('conv t2:', conv_t2.get_shape())
         fuse_2 = tf.add(conv_t2, image_net["pool3"], name="fuse_2")
+        print('fuse 2:', fuse_2.get_shape())
 
         shape = tf.shape(image)
         deconv_shape3 = tf.stack([shape[0], shape[1], shape[2], NUM_OF_CLASSESS])
         W_t3 = utils.weight_variable([16, 16, NUM_OF_CLASSESS, deconv_shape2[3].value], name="W_t3")
         b_t3 = utils.bias_variable([NUM_OF_CLASSESS], name="b_t3")
         conv_t3 = utils.conv2d_transpose_strided(fuse_2, W_t3, b_t3, output_shape=deconv_shape3, stride=8)
+        print('conv t3:', conv_t3.get_shape())
 
         annotation_pred = tf.argmax(conv_t3, dimension=3, name="prediction")
-
+        print('prediction:', annotation_pred.get_shape())
+    
     return tf.expand_dims(annotation_pred, dim=3), conv_t3
 
 
 def train(loss_val, var_list):
-    optimizer = tf.train.AdamOptimizer(FLAGS.learning_rate)
+    optimizer = tf.train.AdamOptimizer(args.learning_rate)
     grads = optimizer.compute_gradients(loss_val, var_list=var_list)
-    if FLAGS.debug:
+    if args.debug:
         # print(len(var_list))
         for grad, var in grads:
             utils.add_gradient_summary(grad, var)
     return optimizer.apply_gradients(grads)
 
 
-def main(argv=None):
+def main():
     keep_probability = tf.placeholder(tf.float32, name="keep_probabilty")
     image = tf.placeholder(tf.float32, shape=[None, IMAGE_SIZE, IMAGE_SIZE, 3], name="input_image")
     annotation = tf.placeholder(tf.int32, shape=[None, IMAGE_SIZE, IMAGE_SIZE, 1], name="annotation")
 
     pred_annotation, logits = inference(image, keep_probability)
+    print('====================================================')
     tf.summary.image("input_image", image, max_outputs=2)
     tf.summary.image("ground_truth", tf.cast(annotation, tf.uint8), max_outputs=2)
     tf.summary.image("pred_annotation", tf.cast(pred_annotation, tf.uint8), max_outputs=2)
     loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
                                                                           labels=tf.squeeze(annotation, squeeze_dims=[3]),
                                                                           name="entropy")))
-    tf.summary.scalar("entropy", loss)
+    tf.summary.scalar("train_entropy", loss)
 
     trainable_var = tf.trainable_variables()
-    if FLAGS.debug:
+    if args.debug:
         for var in trainable_var:
             utils.add_to_regularization_and_summary(var)
     train_op = train(loss, trainable_var)
 
     print("Setting up summary op...")
     summary_op = tf.summary.merge_all()
+    val_summary = tf.summary.scalar("validation_entropy", loss)
 
     print("Setting up image reader...")
-    train_records, valid_records = scene_parsing.read_dataset(FLAGS.data_dir)
+    train_records, valid_records = scene_parsing.read_dataset(args.data_dir)
     print('Train len:', len(train_records))
     print('Val len:', len(valid_records))
 
-    if FLAGS.mode != 'test':
+    if args.mode != 'test':
         print("Setting up dataset reader")
         image_options = {'resize': True, 'resize_size': IMAGE_SIZE}
-        if FLAGS.mode == 'train':
+        if args.mode == 'train':
             train_dataset_reader = dataset.BatchDatset(train_records, image_options)
+            print('Train data set loaded.')
         validation_dataset_reader = dataset.BatchDatset(valid_records, image_options)
+        print('Validation data set loaded.')
 
     sess = tf.Session()
 
     print("Setting up Saver...", flush=True)
     saver = tf.train.Saver()
-    summary_writer = tf.summary.FileWriter(FLAGS.logs_dir, sess.graph)
+    summary_writer = tf.summary.FileWriter(args.logs_dir, sess.graph)
 
+    print("Initialize variables... ", flush=True, end='')
+    s = time.time()
     sess.run(tf.global_variables_initializer())
-    ckpt = tf.train.get_checkpoint_state(FLAGS.logs_dir)
+    e = time.time()
+    print('%.4f secs' % (e - s))
+
+    ms = time.time()
+    ckpt = tf.train.get_checkpoint_state(args.logs_dir)
     if ckpt and ckpt.model_checkpoint_path:
         saver.restore(sess, ckpt.model_checkpoint_path)
-        print("Model restored..." + ckpt.model_checkpoint_path)
+        me = time.time()
+        print("Model restored..." + ckpt.model_checkpoint_path + ', %.4f secs' % (me - ms))
 
-    if FLAGS.mode == "train":
-        for itr in xrange(MAX_ITERATION):
-            train_images, train_annotations = train_dataset_reader.next_batch(FLAGS.batch_size)
+    print('====================================================')
+    print('[' + args.mode + ']')
+
+    if args.mode == 'train':
+        start = args.start_iter
+        end = start + args.iter + 1
+        for itr in range(start, end):
+            train_images, train_annotations = train_dataset_reader.next_batch(args.batch_size)
             feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 0.85}
 
             sess.run(train_op, feed_dict=feed_dict)
@@ -212,13 +244,14 @@ def main(argv=None):
                 summary_writer.add_summary(summary_str, itr)
 
             if itr % 1000 == 0:
-                valid_images, valid_annotations = validation_dataset_reader.next_batch(FLAGS.batch_size)
-                valid_loss = sess.run(loss, feed_dict={image: valid_images, annotation: valid_annotations,
+                valid_images, valid_annotations = validation_dataset_reader.next_batch(args.batch_size)
+                valid_loss, val_str = sess.run([loss, val_summary], feed_dict={image: valid_images, annotation: valid_annotations,
                                                        keep_probability: 1.0})
                 print("%s ---> Validation_loss: %g" % (datetime.datetime.now(), valid_loss))
-                saver.save(sess, FLAGS.logs_dir + "model.ckpt", itr)
+                summary_writer.add_summary(val_str_str, itr)
+                saver.save(sess, args.logs_dir + "model.ckpt", itr)
 
-    elif FLAGS.mode == "visualize":
+    elif args.mode == 'visualize':
 
         for itr in range(20):
             valid_images, valid_annotations = validation_dataset_reader.get_random_batch(1)
@@ -229,25 +262,48 @@ def main(argv=None):
             valid_annotations = np.squeeze(valid_annotations, axis=3)
             pred = np.squeeze(pred, axis=3)
 
-            utils.save_image(valid_images[0].astype(np.uint8), FLAGS.res_dir, name="inp_" + str(itr))
-            utils.save_image(valid_annotations[0].astype(np.uint8), FLAGS.res_dir, name="gt_" + str(itr))
-            utils.save_image(pred[0].astype(np.uint8), FLAGS.res_dir, name="pred_" + str(itr))
+            utils.save_image(valid_images[0].astype(np.uint8), args.res_dir, name="inp_" + str(itr))
+            utils.save_image(valid_annotations[0].astype(np.uint8), args.res_dir, name="gt_" + str(itr))
+            utils.save_image(pred[0].astype(np.uint8), args.res_dir, name="pred_" + str(itr))
             print("Saved image: %d, %.4f secs" % (itr, ve-vs))
 
-    elif FLAGS.mode == "test":
-        testlist = FLAGS.testlist
-        print('Test list: ' + testlist)
-        print('Result directory: ' + FLAGS.res_dir)
-        images, names = read_test_data(testlist, IMAGE_SIZE, IMAGE_SIZE)
+    elif args.mode == 'test':
+        testlist = args.testlist
+        images, names, (H, W) = read_test_data(testlist, IMAGE_SIZE, IMAGE_SIZE)
         for i, (im, name) in enumerate(zip(images, names)):
             ts = time.time()
             pred = sess.run(pred_annotation, feed_dict={image: im.reshape((1,) + im.shape), keep_probability: 1.0})
             te = time.time()
-            print('Img: %d,' % (i) + ' Name: ' + name + ', Inference time: %.4f' % (te-ts))
-            pred = pred.reshape(1, IMAGE_SIZE, IMAGE_SIZE)
-            utils.save_image(im.astype(np.uint8), FLAGS.res_dir + '/', name='inp_' + name)
-            utils.save_image(pred[0].astype(np.uint8), FLAGS.res_dir + '/', name='pred_' + name)
+            pred = pred.reshape(IMAGE_SIZE, IMAGE_SIZE)
+            if args.video:
+                save_video_image(im, pred, args.res_dir + '/pred_%05d' % (i) + '.png', H, W)
+            else:
+                misc.imsave(args.res_dir + '/inp_%d' % (i) + '.png', im.astype(np.uint8))
+                misc.imsave(args.res_dir + '/pred_%d' % (i) + '.png', pred.astype(np.uint8))
+            print('Img: %d,' % (i) + ' Name: ' + name + ', %.4f' % (te-ts) + ' secs')
+
+
+def save_video_image(im, pred, name, oh, ow):
+    
+    bg = np.where(pred != 13)
+    im[bg] = [0, 255, 0]
+    max_edge = max(oh, ow)
+    resized_im = misc.imresize(im, [max_edge, max_edge], interp='nearest')
+    image = Image.fromarray(np.uint8(resized_im))
+    image = image.crop((0, 0, ow, oh))
+    image.save(name)
 
 
 if __name__ == "__main__":
-    tf.app.run()
+
+    args.data_dir += '/'
+    args.logs_dir += '/'
+    args.res_dir += '/'
+    args.model_dir += '/'
+    print('====================================================')
+    for key, value in vars(args).items(): print(key + ':', value)
+    print('====================================================')
+    
+    if not os.path.exists(args.res_dir): os.mkdir(args.res_dir)
+
+    main()

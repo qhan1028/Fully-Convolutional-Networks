@@ -1,18 +1,18 @@
 '''
-FCN_tensorflow: Test Data Reader
+Fully Convolutional Networks for Semantic Segmentation: Test Data Reader
 '''
 __author__ = 'qhan'
 
-from os.path import basename, splitext
 import numpy as np
 import scipy.misc as misc
+import PIL.Image as Image
 
 '''
 :filename: test data list
 :resize_size:
-:return: np array of images & names
+:return: np array of images, names, original size
 '''
-def read_test_data(listname, width, height):
+def read_test_data(listname, height, width):
     
     images, names = [], []
 
@@ -21,12 +21,20 @@ def read_test_data(listname, width, height):
         image_dir = f.readline()[:-1]
 
         for line in f:
-            
-            name = basename(line[:-1])
-            names.append(splitext(name)[0])
 
-            image = misc.imread(image_dir + '/' + name)
+            name = line[:-1]
+            path = image_dir + '/' + name
+            print('\rpath: ' + path, end='', flush=True)
+            image = Image.open(path)
+            (w, h) = image.size
+            max_edge = max(w, h)
+            image = np.array( image.crop((0, 0, max_edge, max_edge)) )
             resized_image = misc.imresize(image, [height, width], interp='nearest')
+
+            names.append(name)
             images.append(resized_image)
 
-    return np.array(images), np.array(names)
+        print('')
+        #h, w, _ = image.shape
+
+    return np.array(images), np.array(names), (h, w)
