@@ -95,10 +95,10 @@ def inference(image, keep_prob):
 
     processed_image = utils.process_image(image, mean_pixel)
 
-    print('----------------------------------------------------')
     with tf.variable_scope("inference"):
         image_net = vgg_net(weights, processed_image)
         conv_final_layer = image_net["conv5_3"]
+        print('----------------------------------------------------')
         print('conv 5_3:', conv_final_layer.get_shape())
 
         pool5 = utils.max_pool_2x2(conv_final_layer)
@@ -202,10 +202,14 @@ def main():
         print("Setting up dataset reader")
         image_options = {'resize': True, 'resize_size': IMAGE_SIZE}
         if args.mode == 'train':
+            ls = time.time()
             train_dataset_reader = dataset.BatchDatset(train_records, image_options)
-            print('Train data set loaded.')
+            le = time.time()
+            print('Train data set loaded. %.4f' % (le-ls))
+        ls = time.time()
         validation_dataset_reader = dataset.BatchDatset(valid_records, image_options)
-        print('Validation data set loaded.')
+        es = time.time()
+        print('Validation data set loaded. %.4f' % (le-ls))
 
     sess = tf.Session()
 
@@ -243,12 +247,12 @@ def main():
                 print("Step: %d, Train_loss:%g" % (itr, train_loss), flush=True)
                 summary_writer.add_summary(summary_str, itr)
 
-            if itr % 1000 == 0:
+            if itr % 500 == 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(args.batch_size)
                 valid_loss, val_str = sess.run([loss, val_summary], feed_dict={image: valid_images, annotation: valid_annotations,
                                                        keep_probability: 1.0})
                 print("%s ---> Validation_loss: %g" % (datetime.datetime.now(), valid_loss))
-                summary_writer.add_summary(val_str_str, itr)
+                summary_writer.add_summary(val_str, itr)
                 saver.save(sess, args.logs_dir + "model.ckpt", itr)
 
     elif args.mode == 'visualize':
