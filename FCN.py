@@ -35,7 +35,7 @@ MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydee
 
 MAX_ITERATION = int(1e5 + 1)
 NUM_OF_CLASSESS = 2
-IMAGE_SIZE = 256
+IMAGE_SIZE = 224
 
 
 def vgg_net(weights, image):
@@ -104,8 +104,8 @@ def inference(image, keep_prob):
         pool5 = utils.max_pool_2x2(conv_final_layer)
         print('pool 5:', pool5.get_shape())
 
-        W6 = utils.weight_variable([8, 8, 512, 1024], name="W6")
-        b6 = utils.bias_variable([1024], name="b6")
+        W6 = utils.weight_variable([7, 7, 512, 2048], name="W6")
+        b6 = utils.bias_variable([2048], name="b6")
         conv6 = utils.conv2d_basic(pool5, W6, b6)
         print('conv 6:', conv6.get_shape())
         relu6 = tf.nn.relu(conv6, name="relu6")
@@ -113,8 +113,8 @@ def inference(image, keep_prob):
             utils.add_activation_summary(relu6)
         relu_dropout6 = tf.nn.dropout(relu6, keep_prob=keep_prob)
 
-        W7 = utils.weight_variable([1, 1, 1024, 1024], name="W7")
-        b7 = utils.bias_variable([1024], name="b7")
+        W7 = utils.weight_variable([1, 1, 2048, 4096], name="W7")
+        b7 = utils.bias_variable([4096], name="b7")
         conv7 = utils.conv2d_basic(relu_dropout6, W7, b7)
         print('conv 7:', conv7.get_shape())
         relu7 = tf.nn.relu(conv7, name="relu7")
@@ -122,7 +122,7 @@ def inference(image, keep_prob):
             utils.add_activation_summary(relu7)
         relu_dropout7 = tf.nn.dropout(relu7, keep_prob=keep_prob)
 
-        W8 = utils.weight_variable([1, 1, 1024, NUM_OF_CLASSESS], name="W8")
+        W8 = utils.weight_variable([1, 1, 4096, NUM_OF_CLASSESS], name="W8")
         b8 = utils.bias_variable([NUM_OF_CLASSESS], name="b8")
         conv8 = utils.conv2d_basic(relu_dropout7, W8, b8)
         print('conv 8:', conv8.get_shape())
