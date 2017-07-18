@@ -27,8 +27,8 @@ def read_test_data(listname, height, width):
             print('\rpath: ' + path, end='', flush=True)
             image = Image.open(path)
             (w, h) = image.size
-            max_edge = max(w, h)
-            image = np.array( image.crop((0, 0, max_edge, max_edge)) )
+            #max_edge = max(w, h)
+            #image = np.array( image.crop((0, 0, max_edge, max_edge)) )
             resized_image = misc.imresize(image, [height, width], interp='nearest')
 
             names.append(name)
