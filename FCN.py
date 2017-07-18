@@ -35,7 +35,7 @@ MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydee
 
 MAX_ITERATION = int(1e5 + 1)
 NUM_OF_CLASSESS = 2
-IMAGE_SIZE = 224
+IMAGE_SIZE = 256
 
 
 def vgg_net(weights, image):
@@ -104,8 +104,8 @@ def inference(image, keep_prob):
         pool5 = utils.max_pool_2x2(conv_final_layer)
         print('pool 5:', pool5.get_shape())
 
-        W6 = utils.weight_variable([7, 7, 512, 4096], name="W6")
-        b6 = utils.bias_variable([4096], name="b6")
+        W6 = utils.weight_variable([8, 8, 512, 1024], name="W6")
+        b6 = utils.bias_variable([1024], name="b6")
         conv6 = utils.conv2d_basic(pool5, W6, b6)
         print('conv 6:', conv6.get_shape())
         relu6 = tf.nn.relu(conv6, name="relu6")
@@ -113,8 +113,8 @@ def inference(image, keep_prob):
             utils.add_activation_summary(relu6)
         relu_dropout6 = tf.nn.dropout(relu6, keep_prob=keep_prob)
 
-        W7 = utils.weight_variable([1, 1, 4096, 4096], name="W7")
-        b7 = utils.bias_variable([4096], name="b7")
+        W7 = utils.weight_variable([1, 1, 1024, 1024], name="W7")
+        b7 = utils.bias_variable([1024], name="b7")
         conv7 = utils.conv2d_basic(relu_dropout6, W7, b7)
         print('conv 7:', conv7.get_shape())
         relu7 = tf.nn.relu(conv7, name="relu7")
@@ -122,7 +122,7 @@ def inference(image, keep_prob):
             utils.add_activation_summary(relu7)
         relu_dropout7 = tf.nn.dropout(relu7, keep_prob=keep_prob)
 
-        W8 = utils.weight_variable([1, 1, 4096, NUM_OF_CLASSESS], name="W8")
+        W8 = utils.weight_variable([1, 1, 1024, NUM_OF_CLASSESS], name="W8")
         b8 = utils.bias_variable([NUM_OF_CLASSESS], name="b8")
         conv8 = utils.conv2d_basic(relu_dropout7, W8, b8)
         print('conv 8:', conv8.get_shape())
@@ -237,14 +237,17 @@ def main():
         start = args.start_iter
         end = start + args.iter + 1
         for itr in range(start, end):
+
             train_images, train_annotations = train_dataset_reader.next_batch(args.batch_size)
+            
+            ts = time.time()
             feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 0.85}
-
             sess.run(train_op, feed_dict=feed_dict)
+            te = time.time()
 
-            if itr % 10 == 0 and itr != 0:
+            if itr % 10 == 0 and itr > 10:
                 train_loss, summary_str = sess.run([loss, summary_op], feed_dict=feed_dict)
-                print("Step: %d, Train_loss:%g" % (itr, train_loss), flush=True)
+                print("Step: %d, Train_loss: %g, %.4f secs" % (itr, train_loss, te-ts), flush=True)
                 summary_writer.add_summary(summary_str, itr)
 
             if itr % 100 == 0 and itr != 0:
