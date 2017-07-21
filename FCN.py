@@ -104,8 +104,8 @@ def inference(image, keep_prob):
         pool5 = utils.max_pool_2x2(conv_final_layer)
         print('pool 5:', pool5.get_shape())
 
-        W6 = utils.weight_variable([5, 5, 512, 2048], name="W6")
-        b6 = utils.bias_variable([2048], name="b6")
+        W6 = utils.weight_variable([5, 5, 512, 4096], name="W6")
+        b6 = utils.bias_variable([4096], name="b6")
         conv6 = utils.conv2d_basic(pool5, W6, b6)
         print('conv 6:', conv6.get_shape())
         relu6 = tf.nn.relu(conv6, name="relu6")
@@ -113,7 +113,7 @@ def inference(image, keep_prob):
             utils.add_activation_summary(relu6)
         relu_dropout6 = tf.nn.dropout(relu6, keep_prob=keep_prob)
 
-        W7 = utils.weight_variable([1, 1, 2048, 4096], name="W7")
+        W7 = utils.weight_variable([1, 1, 4096, 4096], name="W7")
         b7 = utils.bias_variable([4096], name="b7")
         conv7 = utils.conv2d_basic(relu_dropout6, W7, b7)
         print('conv 7:', conv7.get_shape())
@@ -238,8 +238,14 @@ def main():
         end = start + args.iter + 1
         for itr in range(start, end):
 
+            angle = np.random.rand() * 90 - 45
+
             train_images, train_annotations = train_dataset_reader.next_batch(args.batch_size)
-            
+            '''
+            for i, (im, ann) in enumerate(zip(train_images, train_annotations)):
+                train_images[i] = misc.imrotate(im, angle)
+                train_annotations[i] = misc.imrotate(ann[:, :, 0], angle)
+            '''
             ts = time.time()
             feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 0.85}
             sess.run(train_op, feed_dict=feed_dict)
