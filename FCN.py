@@ -104,8 +104,8 @@ def inference(image, keep_prob):
         pool5 = utils.max_pool_2x2(conv_final_layer)
         print('pool 5:', pool5.get_shape())
 
-        W6 = utils.weight_variable([5, 5, 512, 4096], name="W6")
-        b6 = utils.bias_variable([4096], name="b6")
+        W6 = utils.weight_variable([5, 5, 512, 3072], name="W6")
+        b6 = utils.bias_variable([3072], name="b6")
         conv6 = utils.conv2d_basic(pool5, W6, b6)
         print('conv 6:', conv6.get_shape())
         relu6 = tf.nn.relu(conv6, name="relu6")
@@ -113,7 +113,7 @@ def inference(image, keep_prob):
             utils.add_activation_summary(relu6)
         relu_dropout6 = tf.nn.dropout(relu6, keep_prob=keep_prob)
 
-        W7 = utils.weight_variable([1, 1, 4096, 4096], name="W7")
+        W7 = utils.weight_variable([1, 1, 3072, 4096], name="W7")
         b7 = utils.bias_variable([4096], name="b7")
         conv7 = utils.conv2d_basic(relu_dropout6, W7, b7)
         print('conv 7:', conv7.get_shape())
