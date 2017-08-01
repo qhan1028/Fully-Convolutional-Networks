@@ -1,4 +1,4 @@
-# Fully Convolutional Networks for Semantic Segmentation
+# Fully Convolutional Networks for Portrait Matting
 ---
 ### Basic Knowledges
 * [Fully Convolutional Networks](http://simtalk.cn/2016/11/01/Fully-Convolutional-Networks/) (Chinese)
