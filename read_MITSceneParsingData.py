@@ -19,11 +19,11 @@ def read_dataset(data_dir):
         utils.maybe_download_and_extract(data_dir, DATA_URL, is_zipfile=True)
         SceneParsing_folder = os.path.splitext(DATA_URL.split("/")[-1])[0]
         result = create_image_lists(os.path.join(data_dir, SceneParsing_folder))
-        print ("Pickling ...")
+        print ("> [SPD] Pickling ...")
         with open(pickle_filepath, 'wb') as f:
             pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
     else:
-        print ("Found pickle file!")
+        print ("> [SPD] Found pickle file!")
 
     with open(pickle_filepath, 'rb') as f:
         result = pickle.load(f)
@@ -36,7 +36,7 @@ def read_dataset(data_dir):
 
 def create_image_lists(image_dir):
     if not gfile.Exists(image_dir):
-        print("Image directory '" + image_dir + "' not found.")
+        print("> [SPD] Image directory '" + image_dir + "' not found.")
         return None
     directories = ['training', 'validation']
     image_list = {}
@@ -48,7 +48,7 @@ def create_image_lists(image_dir):
         file_list.extend(glob.glob(file_glob))
 
         if not file_list:
-            print('No files found')
+            print('> [SPD] No files found')
         else:
             for f in file_list:
                 filename = os.path.splitext(f.split("/")[-1])[0]
@@ -57,10 +57,10 @@ def create_image_lists(image_dir):
                     record = {'image': f, 'annotation': annotation_file, 'filename': filename}
                     image_list[directory].append(record)
                 else:
-                    print("Annotation file not found for %s - Skipping" % filename)
+                    print("> [SPD] Annotation file not found for %s - Skipping" % filename)
 
         random.shuffle(image_list[directory])
         no_of_images = len(image_list[directory])
-        print ('No. of %s files: %d' % (directory, no_of_images))
+        print ('> [SPD] No. of %s files: %d' % (directory, no_of_images))
 
     return image_list
