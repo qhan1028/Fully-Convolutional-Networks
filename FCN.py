@@ -157,8 +157,6 @@ s = lambda x: max(0, x)
 e = lambda x: x if x < 0 else None
 
 def augment(np_image):
-    print('> [Aug] ', np_image.shape)
-
     # annotation 3rd dim is 1 -> need to shrink shape to 2 dims for PIL
     if np_image.shape[2] == 1:
         im = np_image[:, :, 0]
@@ -188,8 +186,11 @@ def augment(np_image):
     dy = np.random.randint(-max_dy, max_dy)
     sft_im[s(dy):e(dy), s(dx):e(dx)] = im[s(-dy):e(-dy), s(-dx):e(-dx)] # crop
     im = sft_im
-
-    np_image[:, :, 0] = im
+    
+    if np_image.shape[2] == 1:
+        np_image[:, :, 0] = im
+    else:
+        np_image = im
 
     return np_image
 
@@ -285,8 +286,8 @@ def main(args):
                 print("[%6d], Train_loss: %g, %.4f ms" % (itr, train_loss, train_time), flush=True)
 
             if itr % 100 == 0 and itr != 0:
-                val_feed_dict = { image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(args.batch_size)
+                val_feed_dict = { image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
                 valid_loss, val_str = sess.run([loss, val_summary], feed_dict=val_feed_dict)
                 summary_writer.add_summary(val_str, itr)
                 print("[%6d], Validation_loss: %g" % (itr, valid_loss))

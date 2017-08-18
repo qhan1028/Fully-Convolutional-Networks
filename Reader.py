@@ -1,7 +1,8 @@
 '''
 Fully Convolutional Networks for Semantic Segmentation: Test Data Reader
 '''
-__author__ = 'qhan'
+
+from __future__ import print_function
 
 import numpy as np
 import scipy.misc as misc
