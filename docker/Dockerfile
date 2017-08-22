@@ -39,4 +39,4 @@ WORKDIR /app
 COPY .vimrc /root/
 
 
-CMD ['bash']
+CMD ["bash"]
