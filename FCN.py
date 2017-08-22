@@ -156,43 +156,50 @@ def train(loss_val, var_list):
 s = lambda x: max(0, x)
 e = lambda x: x if x < 0 else None
 
-def augment(np_image):
+def augment(np_image, flip_prob, aug_type, randoms):
     # annotation 3rd dim is 1 -> need to shrink shape to 2 dims for PIL
-    if np_image.shape[2] == 1:
-        im = np_image[:, :, 0]
-    else:
-        im = np_image
+    if np_image.shape[2] == 1: # annotation
+        im = np.array(np_image[:, :, 0])
+    else: # image
+        im = np.array(np_image)
 
-    if np.random.random() >= 0.5: 
+    if flip_prob >= 0.5: 
         im = im[:, ::-1]
 
-    # zoom
-    zoom = np.random.random() * 0.4 + 1
     h, w = im.shape[0], im.shape[1]
-    new_h, new_w = int(h * zoom), int(w * zoom)
-    pad_x, pad_y = int((new_w - w) / 2), int((new_h - h) / 2)
-    
     pil_im = Image.fromarray(im.astype(np.uint8))
-    pil_im = pil_im.resize((new_w, new_h), Image.CUBIC)
 
-    # rotation
-    angle = np.random.random() * 90 - 45
-    im = np.array( pil_im.rotate(angle).crop((pad_x, pad_y, pad_x + w, pad_y + h)) )
+    # zoom: 0.9 ~ 1.1
+    if aug_type == 0:
+        zoom = randoms[0] * 0.2 + 1
+        new_h, new_w = int(h * zoom), int(w * zoom)
+        pad_x, pad_y = int((new_w - w) / 2), int((new_h - h) / 2)
+        pil_im = pil_im.resize((new_w, new_h), Image.BICUBIC).crop((pad_x, pad_y, pad_x + w, pad_y + h))
+        im = np.array(pil_im)
 
-    # horizontal and vertical shift
-    sft_im = np.zeros_like(im)
-    max_dx, max_dy = int(w / 4), int(h / 4)
-    dx = np.random.randint(-max_dx, max_dx)
-    dy = np.random.randint(-max_dy, max_dy)
-    sft_im[s(dy):e(dy), s(dx):e(dx)] = im[s(-dy):e(-dy), s(-dx):e(-dx)] # crop
-    im = sft_im
-    
-    if np_image.shape[2] == 1:
-        np_image[:, :, 0] = im
+    # rotation: -22.5 ~ +22.5
+    elif aug_type == 1:
+        angle = randoms[0] * 45 - 22.5
+        im = np.array( pil_im.rotate(angle, resample=Image.BICUBIC) )
+
+    # horizontal and vertical shift: -12.5% ~ +12.5%
+    elif aug_type == 2:
+        sft_im = np.zeros_like(im)
+        max_dx, max_dy = int(w / 8), int(h / 8)
+        dx = int( randoms[0] * max_dx * 2 - max_dx )
+        dy = int( randoms[1] * max_dy * 2 - max_dy )
+        sft_im[s(dy):e(dy), s(dx):e(dx)] = im[s(-dy):e(-dy), s(-dx):e(-dx)] # crop
+        im = sft_im
+
     else:
-        np_image = im
-
-    return np_image
+        pass
+    
+    if np_image.shape[2] == 1: # annotation
+        result_im = np.array(np_image)
+        result_im[:, :, 0] = im
+        return result_im
+    else: # image
+        return im
 
 
 def main(args):
@@ -205,14 +212,13 @@ def main(args):
 
     # Summary
     print('====================================================')
-    tf.summary.image("input_image", image, max_outputs=2)
-    tf.summary.image("ground_truth", tf.cast(annotation, tf.uint8), max_outputs=2)
-    tf.summary.image("pred_annotation", tf.cast(pred_annotation * 255, tf.uint8), max_outputs=2)
+    tf.summary.image("input_image", image, max_outputs=4)
+    tf.summary.image("ground_truth", tf.cast(annotation * 255, tf.uint8), max_outputs=4)
+    tf.summary.image("pred_annotation", tf.cast(pred_annotation * 255, tf.uint8), max_outputs=4)
     loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
                                                                           labels=tf.squeeze(annotation, squeeze_dims=[3]),
                                                                           name="entropy")))
     tf.summary.scalar("train_entropy", loss)
-    val_summary = tf.summary.scalar("validation_entropy", loss)
 
     trainable_var = tf.trainable_variables()
     if args.debug:
@@ -222,6 +228,7 @@ def main(args):
 
     print("> [FCN] Setting up summary op...")
     summary_op = tf.summary.merge_all()
+    val_summary = tf.summary.scalar("validation_entropy", loss)
 
     # Read data
     print("> [FCN] Setting up image reader...")
@@ -263,20 +270,26 @@ def main(args):
     print('==================================================== [%s]' % args.mode)
 
     if args.mode == 'train':
+        np.random.seed(1028)
         start = args.start_iter
         end = start + args.iter + 1
         for itr in range(start, end):
 
             # read batch data
             train_images, train_annotations = train_dataset_reader.next_batch(args.batch_size)
+            images = np.zeros_like(train_images)
+            annotations = np.zeros_like(train_annotations)
 
-            # augmentation on angle
+            # augmentation
             for i, (im, ann) in enumerate(zip(train_images, train_annotations)):
-                train_images[i] = augment(im)
-                train_annotations[i] = augment(ann)
+                flip_prob = np.random.random()
+                aug_type = np.random.randint(0, 3)
+                randoms = np.random.random(2)
+                images[i] = augment(im, flip_prob, aug_type, randoms)
+                annotations[i] = augment(ann, flip_prob, aug_type, randoms)
 
             t.tic()
-            feed_dict = {image: train_images, annotation: train_annotations, keep_probability: 0.85}
+            feed_dict = {image: images, annotation: annotations, keep_probability: 0.85}
             sess.run(train_op, feed_dict=feed_dict)
             train_time = t.toc()
 
@@ -286,7 +299,7 @@ def main(args):
                 print("[%6d], Train_loss: %g, %.4f ms" % (itr, train_loss, train_time), flush=True)
 
             if itr % 100 == 0 and itr != 0:
-                valid_images, valid_annotations = validation_dataset_reader.next_batch(args.batch_size)
+                valid_images, valid_annotations = validation_dataset_reader.get_random_batch(args.batch_size * 2)
                 val_feed_dict = { image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
                 valid_loss, val_str = sess.run([loss, val_summary], feed_dict=val_feed_dict)
                 summary_writer.add_summary(val_str, itr)
