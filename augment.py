@@ -22,7 +22,7 @@ def augment(np_image, flip_prob, aug_type, randoms):
     h, w = im.shape[0], im.shape[1]
     pil_im = Image.fromarray(im.astype(np.uint8))
 
-    # zoom: 0.7 ~ 1.3
+    # zoom: 1 ± 0.5
     if aug_type == 0:
         max_scale = 0.5
         zoom = (randoms[0] * 2 - 1) * max_scale + 1
@@ -31,14 +31,14 @@ def augment(np_image, flip_prob, aug_type, randoms):
         pil_im = pil_im.resize((new_w, new_h), Image.BICUBIC).crop((pad_x, pad_y, pad_x + w, pad_y + h))
         im = np.array(pil_im)
 
-    # rotation: -180 ~ +180
+    # rotation: ± 90
     elif aug_type == 1:
         max_angle = 90
         angle = ( randoms[0] * 2 - 1 ) * max_angle
         pil_im = pil_im.rotate(angle, resample=Image.BICUBIC)
         im = np.array(pil_im)
 
-    # horizontal and vertical shift: -12.5% ~ +12.5%
+    # horizontal and vertical shift: ± 50%
     elif aug_type == 2:
         max_sft = 0.5
         max_dx, max_dy = int(w * max_sft), int(h * max_sft)

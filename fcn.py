@@ -4,7 +4,6 @@
 #
 
 from __future__ import print_function
-import argparse
 import sys
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL']='3'
@@ -18,7 +17,7 @@ import tensorflow_utils as utils
 import batch_datset_reader as dataset
 
 import timer
-from reader import read_test_data, read_dataset
+from reader import read_test_data, read_dataset, parse_args
 from augment import augment
 
 MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydeep-19.mat'
@@ -159,7 +158,7 @@ def train(loss_val, var_list):
     return optimizer.apply_gradients(grads)
 
 
-def main(args):
+def main():
     # tensorflow input and output
     keep_probability = tf.placeholder(tf.float32, name="keep_probabilty")
     image = tf.placeholder(tf.float32, shape=[None, IMAGE_HEIGHT, IMAGE_WIDTH, 3], name="input_image")
@@ -258,7 +257,7 @@ def main(args):
                 print("[%6d], Train_loss: %g, %.4f ms" % (itr, train_loss, train_time), flush=True)
 
             if itr % 100 == 0 and itr != 0:
-                valid_images, valid_annotations = validation_dataset_reader.get_random_batch(args.batch_size * 2)
+                valid_images, valid_annotations = validation_dataset_reader.next_batch(args.batch_size * 2)
                 val_feed_dict = { image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
                 valid_loss, val_str = sess.run([loss, val_summary], feed_dict=val_feed_dict)
                 summary_writer.add_summary(val_str, itr)
@@ -315,29 +314,6 @@ def save_video_image(im, pred, name, oh, ow):
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser('Fully Convolutional Networks for Semantic Segmentation.')
-    parser.add_argument('-m', '--mode', metavar='MODE', default='train', choices=['train', 'visualize', 'test'], help='Mode: train / visualize / test.')
-    parser.add_argument('-b', '--batch-size', metavar='N', default=2, nargs='?', type=int, help='Batch size for training.')
-    parser.add_argument('-e', '--learning-rate', '--eta', metavar='N', default=1e-4, nargs='?', type=float, help='Learning rate for Adam Optimizer.')
-    parser.add_argument('-i', '--iter', metavar='N', default=int(1e5), nargs='?', type=int, help='Max iteration for training.')
-    parser.add_argument('-si', '--start-iter', metavar='N', default=0, nargs='?', type=int, help='Start iteration for training.')
-    parser.add_argument('-d', '--data-dir', metavar='DIR', default='Data_zoo/MIT_SceneParsing', nargs='?', help='Path to training & validation data.')
-    parser.add_argument('-ld', '--logs-dir', metavar='DIR', default='logs', nargs='?', help='Path to logs directory.')
-    parser.add_argument('-rd', '--res-dir', metavar='DIR', default='res', nargs='?', help='Path to result directory.')
-    parser.add_argument('-md', '--model-dir', metavar='DIR', default='Model_zoo', nargs='?', help='Path to vgg pretrained model.')
-    parser.add_argument('--debug', action='store_true', default=False, help='Debug mode.')
-    parser.add_argument('--testlist', metavar='FILE', default='testlist.txt', nargs='?', help='Test list for testing.')
-    parser.add_argument('-v', '--video', action='store_true', default=False, help='Resize back to original size.')
-    args = parser.parse_args()
-
-    args.data_dir += '/'
-    args.logs_dir += '/'
-    args.res_dir += '/'
-    args.model_dir += '/'
-    if not os.path.exists(args.res_dir): os.mkdir(args.res_dir)
-
+    args = parse_args()
     print('====================================================')
-    for key, value in vars(args).items(): print('> [Args]', key + ':', value)
-    
-    print('====================================================')
-    main(args)
+    main()

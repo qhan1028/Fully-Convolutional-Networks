@@ -5,6 +5,38 @@
 
 from __future__ import print_function
 
+import argparse
+
+# Argument parser
+def parse_args():
+
+    parser = argparse.ArgumentParser('Fully Convolutional Networks for Semantic Segmentation.')
+    parser.add_argument('-m', '--mode', metavar='MODE', default='train', choices=['train', 'visualize', 'test'], help='Mode: train / visualize / test.')
+    parser.add_argument('-b', '--batch-size', metavar='N', default=2, nargs='?', type=int, help='Batch size for training.')
+    parser.add_argument('-e', '--learning-rate', '--eta', metavar='N', default=1e-4, nargs='?', type=float, help='Learning rate for Adam Optimizer.')
+    parser.add_argument('-i', '--iter', metavar='N', default=int(1e5), nargs='?', type=int, help='Max iteration for training.')
+    parser.add_argument('-si', '--start-iter', metavar='N', default=0, nargs='?', type=int, help='Start iteration for training.')
+    parser.add_argument('-d', '--data-dir', metavar='DIR', default='Data_zoo/MIT_SceneParsing', nargs='?', help='Path to training & validation data.')
+    parser.add_argument('-ld', '--logs-dir', metavar='DIR', default='logs', nargs='?', help='Path to logs directory.')
+    parser.add_argument('-rd', '--res-dir', metavar='DIR', default='res', nargs='?', help='Path to result directory.')
+    parser.add_argument('-md', '--model-dir', metavar='DIR', default='Model_zoo', nargs='?', help='Path to vgg pretrained model.')
+    parser.add_argument('--debug', action='store_true', default=True, help='Debug mode.')
+    parser.add_argument('--testlist', metavar='FILE', default='testlist.txt', nargs='?', help='Test list for testing.')
+    parser.add_argument('-v', '--video', action='store_true', default=False, help='Resize back to original size.')
+    args = parser.parse_args()
+
+    args.data_dir += '/'
+    args.logs_dir += '/'
+    args.res_dir += '/'
+    args.model_dir += '/'
+    if not os.path.exists(args.res_dir): os.mkdir(args.res_dir)
+
+    print('====================================================')
+    for key, value in vars(args).items(): print('> [Args]', key + ':', value)
+    
+    return args
+
+
 import numpy as np
 import scipy.misc as misc
 from PIL import Image
