@@ -4,7 +4,8 @@
 #
 
 import numpy as np
-from PIL import Image
+#from PIL import Image
+import cv2
 
 s = lambda x: max(0, x)
 e = lambda x: x if x < 0 else None
@@ -19,8 +20,8 @@ def augment(np_image, flip_prob, aug_type, randoms):
     if flip_prob >= 0.5: 
         im = im[:, ::-1]
 
-    h, w = im.shape[0], im.shape[1]
-    pil_im = Image.fromarray(im.astype(np.uint8))
+    h, w = im.shape[:2]
+    #pil_im = Image.fromarray(im.astype(np.uint8))
 
     # zoom: 1 ± 0.5
     if aug_type == 0:
@@ -28,15 +29,19 @@ def augment(np_image, flip_prob, aug_type, randoms):
         zoom = (randoms[0] * 2 - 1) * max_scale + 1
         new_h, new_w = int(h * zoom), int(w * zoom)
         pad_x, pad_y = int((new_w - w) / 2), int((new_h - h) / 2)
-        pil_im = pil_im.resize((new_w, new_h), Image.BICUBIC).crop((pad_x, pad_y, pad_x + w, pad_y + h))
-        im = np.array(pil_im)
+        im = cv2.resize(im, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+        im = im[pad_y:pad_y+h, pad_x:pad_x+w]
+        #pil_im = pil_im.resize((new_w, new_h), Image.BICUBIC).crop((pad_x, pad_y, pad_x + w, pad_y + h))
+        #im = np.array(pil_im)
 
     # rotation: ± 90
     elif aug_type == 1:
         max_angle = 90
         angle = ( randoms[0] * 2 - 1 ) * max_angle
-        pil_im = pil_im.rotate(angle, resample=Image.BICUBIC)
-        im = np.array(pil_im)
+        M = cv2.getRotationMatrix2D((w/2, h/2), angle, 1)
+        im = cv2.warpAffine(im, M, (w, h))
+        #pil_im = pil_im.rotate(angle, resample=Image.BICUBIC)
+        #im = np.array(pil_im)
 
     # horizontal and vertical shift: ± 50%
     elif aug_type == 2:

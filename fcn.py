@@ -24,8 +24,8 @@ MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydee
 
 MAX_ITERATION = int(1e5 + 1)
 NUM_OF_CLASSESS = 2
-IMAGE_HEIGHT = 224
-IMAGE_WIDTH = 224
+IMAGE_HEIGHT = 400
+IMAGE_WIDTH = 300
 
 
 def vgg_net(weights, image):
@@ -259,9 +259,11 @@ def main():
             if itr % 100 == 0 and itr != 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(args.batch_size * 2)
                 val_feed_dict = { image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
-                valid_loss, val_str = sess.run([loss, val_summary], feed_dict=val_feed_dict)
+                t.tic()
+                val_loss, val_str = sess.run([loss, val_summary], feed_dict=val_feed_dict)
+                val_time = t.toc()
                 summary_writer.add_summary(val_str, itr)
-                print("[%6d], Validation_loss: %g" % (itr, valid_loss))
+                print("[%6d], Validation_loss: %g, %.4f ms" % (itr, val_loss, val_time))
              
             if itr % 1000 == 0 and itr != 0:
                 saver.save(sess, args.logs_dir + "model.ckpt", itr)

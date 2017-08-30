@@ -4,7 +4,7 @@ Code ideas from https://github.com/Newmu/dcgan and tensorflow mnist dataset read
 import numpy as np
 import scipy.misc as misc
 import os.path as osp
-
+import cv2
 
 class BatchDatset:
     files = []
@@ -56,7 +56,8 @@ class BatchDatset:
         if self.image_options.get("resize", False) and self.image_options["resize"]:
             resize_height = int(self.image_options["resize_height"])
             resize_width = int(self.image_options["resize_width"])
-            resize_image = misc.imresize(image, [resize_height, resize_width], interp='nearest')
+            #resize_image = misc.imresize(image, [resize_height, resize_width], interp='nearest')
+            resize_image = cv2.resize(image, (resize_width, resize_height), interpolation=cv2.INTER_CUBIC)
 
         else:
             resize_image = image
