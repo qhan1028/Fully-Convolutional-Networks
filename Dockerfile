@@ -26,7 +26,8 @@ RUN pip3 install \
         scikit-learn>=0.17.1 \
         scipy>=0.17.1 \
         six>=1.10.0 \
-        tensorflow-gpu==1.2.1
+        tensorflow-gpu==1.2.1 \
+        opencv-python
 
 
 ## -----------------------------------------------------------------------------

@@ -49,7 +49,8 @@ class BatchDatset:
         print('> [BDR] Annotations shape:', self.annotations.shape)
 
     def _transform(self, filename):
-        image = misc.imread(filename)
+        image = cv2.imread(filename)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         if self.__channels and len(image.shape) < 3:  # make sure images are of shape(h,w,3)
             image = np.array([image for i in range(3)])
 
