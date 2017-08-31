@@ -13,12 +13,12 @@
 
 ### Data Sets
 * [MIT Scene Parsing ADE 20K](http://groups.csail.mit.edu/vision/datasets/ADE20K/)
-    * 20210 training images (I picked only 10000)
+    * 20210 training images (not used)
     * 2000 validation images
 * [Portraits 2K](http://xiaoyongshen.me/webpage_portrait/index.html)
-    * 1719 training images
+    * 1719 training images (used)
 * [PASCAL VOC 2012 3K](http://host.robots.ox.ac.uk/pascal/VOC/voc2012/index.html#devkit)
-    * 2913 training images
+    * 2913 training images (used)
 
 ### Model
 * `conv1_1`~`conv5_3`: [VGG-19](http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydeep-19.mat)
@@ -28,23 +28,46 @@
 ```
 .Fully-Convolutional-Networks/
 ├── .Data_zoo/
-│   └── ...
+│   └── .MIT_SceneParsing/
+│       ├── ADEChallengeData2016.zip
+│       ├── MITSceneParsing.pickle
+│       ├── train_data.npz (show up after first train)
+│       ├── val_data.npz (show up after first train)
+│       └── .ADEChallengeData2016/
+│           ├── sceneCategories.txt
+│           ├── .images/
+│           │   ├── .training/
+│           │   └── .validation/
+│           │
+│           └── .annotations/
+│               ├── .training/
+│               └── .validation/
+│
 ├── .Model_zoo/
 │   └── imagenet-vgg-verydeep-19.mat
+│
 ├── .logs/
 │   ├── checkpoint
 │   ├── model.ckpt-100000.data-00000-of-00001
 │   ├── model.ckpt-100000.meta
 │   └── model.ckpt-100000.index
-├── BatchDatsetReader.py
-├── FCN.py
-├── read_MITSceneParsingData.py
-├── Reader.py
-├── TensorflowUtils.py
-├── README.md
-├── mat.sh
-└── train.sh
+│
+├── fcn.py (main program)
+├── augment.py
+├── batch_datset_reader.py
+├── reader.py
+├── tensorflow_utils.py
+└── README.md
+
 ```
+
+* For each data, the filename in `image/`, `annotation/` folder must be same.
+
+### Data Augmentations
+* Flip: 50% horizontally
+* Rotation: -90 ~ +90
+* Scale: 0.5 ~ 1.5
+* Shift: -50% ~ +50% horizontally & vertically
 
 ### Requirements
 * `tensorflow-gpu == 1.2.1`
@@ -52,8 +75,6 @@
 ### Quick Usage
 * Train
     * `python3.5 FCN.py -m train`
-      or
-    * `./train.sh`
 * Visualize
     * `python3.5 FCN.py -m visualize`
 * Test
