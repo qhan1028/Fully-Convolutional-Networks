@@ -23,9 +23,9 @@ from augment import augment
 MODEL_URL = 'http://www.vlfeat.org/matconvnet/models/beta16/imagenet-vgg-verydeep-19.mat'
 
 MAX_ITERATION = int(1e5 + 1)
-NUM_OF_CLASSESS = 2
-IMAGE_HEIGHT = 400
-IMAGE_WIDTH = 300
+NUM_OF_CLASSESS = 2 # original is 151
+IMAGE_HEIGHT = 224
+IMAGE_WIDTH = 224
 
 
 def vgg_net(weights, image):
@@ -94,7 +94,7 @@ def inference(image, keep_prob):
         pool5 = utils.max_pool_2x2(conv_final_layer)
         print('pool 5  :', pool5.get_shape())
 
-        W6 = utils.weight_variable([3, 3, 512, 4096], name="W6")
+        W6 = utils.weight_variable([3, 3, 512, 4096], name="W6") # original is [7, 7, 512, 4096]
         b6 = utils.bias_variable([4096], name="b6")
         conv6 = utils.conv2d_basic(pool5, W6, b6)
         print('conv 6  :', conv6.get_shape())
