@@ -94,7 +94,7 @@ def inference(image, keep_prob):
         pool5 = utils.max_pool_2x2(conv_final_layer)
         print('pool 5  :', pool5.get_shape())
 
-        W6 = utils.weight_variable([3, 3, 512, 4096], name="W6") # original is [7, 7, 512, 4096]
+        W6 = utils.weight_variable([7, 7, 512, 4096], name="W6") # original is [7, 7, 512, 4096]
         b6 = utils.bias_variable([4096], name="b6")
         conv6 = utils.conv2d_basic(pool5, W6, b6)
         print('conv 6  :', conv6.get_shape())
