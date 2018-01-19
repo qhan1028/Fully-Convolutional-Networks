@@ -168,31 +168,32 @@ def main():
 
     # Summary
     print('====================================================')
-    tf.summary.image("input_image", image, max_outputs=4)
-    tf.summary.image("ground_truth", tf.cast(annotation * 255, tf.uint8), max_outputs=4)
-    tf.summary.image("pred_annotation", tf.cast(pred_annotation * 255, tf.uint8), max_outputs=4)
-    loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
-                                                                          labels=tf.squeeze(annotation, squeeze_dims=[3]),
-                                                                          name="entropy")))
-    tf.summary.scalar("train_entropy", loss)
+    if args.mode != 'test':
+        tf.summary.image("input_image", image, max_outputs=4)
+        tf.summary.image("ground_truth", tf.cast(annotation * 255, tf.uint8), max_outputs=4)
+        tf.summary.image("pred_annotation", tf.cast(pred_annotation * 255, tf.uint8), max_outputs=4)
+        loss = tf.reduce_mean((tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logits,
+                                                                              labels=tf.squeeze(annotation, squeeze_dims=[3]),
+                                                                              name="entropy")))
+        tf.summary.scalar("train_entropy", loss)
 
-    trainable_var = tf.trainable_variables()
-    if args.debug:
-        for var in trainable_var:
-            utils.add_to_regularization_and_summary(var)
-    train_op = train(loss, trainable_var)
+        trainable_var = tf.trainable_variables()
+        if args.debug:
+            for var in trainable_var:
+                utils.add_to_regularization_and_summary(var)
+        train_op = train(loss, trainable_var)
 
-    print("> [FCN] Setting up summary op...")
-    summary_op = tf.summary.merge_all()
+        print("> [FCN] Setting up summary op...")
+        summary_op = tf.summary.merge_all()
 
-    # Validation summary
-    val_summary = tf.summary.scalar("validation_entropy", loss)
+        # Validation summary
+        val_summary = tf.summary.scalar("validation_entropy", loss)
 
-    # Read data
-    print("> [FCN] Setting up image reader...")
-    train_records, valid_records = read_dataset(args.data_dir)
-    print('> [FCN] Train len:', len(train_records))
-    print('> [FCN] Val len:', len(valid_records))
+        # Read data
+        print("> [FCN] Setting up image reader...")
+        train_records, valid_records = read_dataset(args.data_dir)
+        print('> [FCN] Train len:', len(train_records))
+        print('> [FCN] Val len:', len(valid_records))
 
     t = timer.Timer() # Qhan's timer
 
@@ -201,12 +202,11 @@ def main():
         image_options = {'resize': True, 'resize_height': IMAGE_HEIGHT, 'resize_width': IMAGE_WIDTH}
         if args.mode == 'train':
             t.tic(); train_dataset_reader = dataset.BatchDatset(train_records, image_options, mode='train')
-            load_time = t.toc()
-            print('> [FCN] Train data set loaded. %.4f ms' % (load_time))
+            print('> [FCN] Train data set loaded. %.4f ms' % t.toc())
         t.tic(); validation_dataset_reader = dataset.BatchDatset(valid_records, image_options, mode='val')
-        load_time = t.toc()
-        print('> [FCN] Validation data set loaded. %.4f ms' % (load_time))
+        print('> [FCN] Validation data set loaded. %.4f ms' % t.toc())
 
+    # Setup Session
     gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.90, allow_growth=True)
     sess = tf.Session( config=tf.ConfigProto(gpu_options=gpu_options) )
 
@@ -217,7 +217,7 @@ def main():
 
     print("> [FCN] Initialize variables... ", flush=True, end='')
     t.tic(); sess.run(tf.global_variables_initializer())
-    print('%.4f ms' % (t.toc()))
+    print('%.4f ms' % t.toc())
 
     t.tic()
     ckpt = tf.train.get_checkpoint_state(args.logs_dir)
@@ -259,11 +259,11 @@ def main():
             if itr % 100 == 0 and itr != 0:
                 valid_images, valid_annotations = validation_dataset_reader.next_batch(args.batch_size * 2)
                 val_feed_dict = { image: valid_images, annotation: valid_annotations, keep_probability: 1.0}
-                t.tic()
-                val_loss, val_str = sess.run([loss, val_summary], feed_dict=val_feed_dict)
-                val_time = t.toc()
+                
+                t.tic(); val_loss, val_str = sess.run([loss, val_summary], feed_dict=val_feed_dict)
+                print("[%6d], Validation_loss: %g, %.4f ms" % (itr, val_loss, t.toc()))
+
                 summary_writer.add_summary(val_str, itr)
-                print("[%6d], Validation_loss: %g, %.4f ms" % (itr, val_loss, val_time))
              
             if itr % 1000 == 0 and itr != 0:
                 saver.save(sess, args.logs_dir + "model.ckpt", itr)
@@ -271,9 +271,9 @@ def main():
     elif args.mode == 'visualize':
         for itr in range(20):
             valid_images, valid_annotations = validation_dataset_reader.get_random_batch(1)
-            t.tic()
-            pred = sess.run(pred_annotation, feed_dict={image: valid_images, keep_probability: 1.0})
-            val_time = t.toc()
+            
+            t.tic(); pred = sess.run(pred_annotation, feed_dict={image: valid_images, keep_probability: 1.0})
+            print("> [FCN] Saved image: %d, %.4f ms" % (itr, t.toc()))
 
             valid_annotations = np.squeeze(valid_annotations, axis=3)
             pred = np.squeeze(pred, axis=3)
@@ -281,16 +281,13 @@ def main():
             utils.save_image(valid_images[0].astype(np.uint8), args.res_dir, name="inp_" + str(itr))
             utils.save_image(valid_annotations[0].astype(np.uint8), args.res_dir, name="gt_" + str(itr))
             utils.save_image(pred[0].astype(np.uint8), args.res_dir, name="pred_" + str(itr))
-            print("> [FCN] Saved image: %d, %.4f ms" % (itr, val_time))
 
     elif args.mode == 'test':
-        testlist = args.testlist
-        images, names, (H, W) = read_test_data(testlist, IMAGE_HEIGHT, IMAGE_WIDTH)
+        images, names, (H, W) = read_test_data(args.test_dir, IMAGE_HEIGHT, IMAGE_WIDTH)
         for i, (im, name) in enumerate(zip(images, names)):
             
-            t.tic()
-            pred = sess.run(pred_annotation, feed_dict={image: im.reshape((1,) + im.shape), keep_probability: 1.0})
-            test_time = t.toc()
+            t.tic(); pred = sess.run(pred_annotation, feed_dict={image: im.reshape((1,) + im.shape), keep_probability: 1.0})
+            print('> [FCN] Test: %d,' % (i) + ' Name: ' + name + ', %.4f ms' % t.toc())
             
             pred = pred.reshape(IMAGE_HEIGHT, IMAGE_WIDTH)
             if args.video:
@@ -298,7 +295,6 @@ def main():
             else:
                 misc.imsave(args.res_dir + '/inp_%d' % (i) + '.png', im.astype(np.uint8))
                 misc.imsave(args.res_dir + '/pred_%d' % (i) + '.png', pred.astype(np.uint8))
-            print('> [FCN] Img: %d,' % (i) + ' Name: ' + name + ', %.4f ms' % test_time)
 
     else:
         pass

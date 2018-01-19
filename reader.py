@@ -6,6 +6,10 @@
 from __future__ import print_function
 
 import argparse
+import numpy as np
+import os
+import os.path as osp
+import cv2
 
 # Argument parser
 def parse_args():
@@ -20,8 +24,8 @@ def parse_args():
     parser.add_argument('-ld', '--logs-dir', metavar='DIR', default='logs', nargs='?', help='Path to logs directory.')
     parser.add_argument('-rd', '--res-dir', metavar='DIR', default='res', nargs='?', help='Path to result directory.')
     parser.add_argument('-md', '--model-dir', metavar='DIR', default='Model_zoo', nargs='?', help='Path to vgg pretrained model.')
+    parser.add_argument('-td', '--test-dir', metavar='DIR', default='test', nargs='?', help='Test directory.')
     parser.add_argument('--debug', action='store_true', default=True, help='Debug mode.')
-    parser.add_argument('--testlist', metavar='FILE', default='testlist.txt', nargs='?', help='Test list for testing.')
     parser.add_argument('-v', '--video', action='store_true', default=False, help='Resize back to original size.')
     args = parser.parse_args()
 
@@ -37,41 +41,31 @@ def parse_args():
     return args
 
 
-import numpy as np
-import scipy.misc as misc
-from PIL import Image
-
-'''
-:filename: test data list
-:resize_size:
-:return: np array of images, names, original size
-'''
-def read_test_data(listname, height, width):
+def read_test_data(testdir, height, width):
     
+    if testdir[-1] != '/': testdir += '/'
+    oh, ow = None, None
     images, names = [], []
 
-    with open(listname, 'r') as f:
-        
-        image_dir = f.readline()[:-1]
+    for filename in os.listdir(testdir):
+        name, ext = osp.splitext(filename)
+        if ext in ['.jpg', 'png', 'gif']:
+            print('\r> image:', filename, end='')
+            im = cv2.imread(testdir + filename)
+            
+            if oh is None:
+                oh, ow = im.shape[:2]
 
-        for line in f:
-
-            name = line[:-1]
-            path = image_dir + '/' + name
-            print('\rpath: ' + path, end='', flush=True)
-            image = Image.open(path)
-            (w, h) = image.size
-            #max_edge = max(w, h)
-            #image = np.array( image.crop((0, 0, max_edge, max_edge)) )
-            resized_image = misc.imresize(image, [height, width], interp='nearest')
-
+            im_resized = cv2.resize(im, (width, height), cv2.INTER_CUBIC)
+            im_rgb = cv2.cvtColor(im_resized, cv2.COLOR_BGR2RGB)
             names.append(name)
-            images.append(resized_image)
+            images.append(im_rgb)
+        else:
+            print('> skip:', filename)
+    
+    print('')
 
-        print('')
-        #h, w, _ = image.shape
-
-    return np.array(images), np.array(names), (h, w)
+    return np.array(images), np.array(names), (oh, ow)
 
 
 #

@@ -74,12 +74,10 @@
 
 ### Quick Usage
 * Train
-    * `python3.5 FCN.py -m train`
+    * `python3.5 fcn.py -m train`
 * Visualize
-    * `python3.5 FCN.py -m visualize`
+    * `python3.5 fcn.py -m visualize`
 * Test
-    * `python3.5 FCN.py -m test -tl <test_list>`
-* Mat video
-    * `./mat.sh <video_name>`
+    * `python3.5 fcn.py -m test -tl <test_list>`
 * To see full usage
-    * `python3.5 FCN.py --help`
+    * `python3.5 fcn.py --help`
